@@ -77,6 +77,57 @@ router.get("/", authenticateJWT, async (req, res) => {
   }
 });
 
+// GET semua pesanan lengkap beserta item-nya (riwayat belanja user)
+router.get("/detail", authenticateJWT, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT 
+         o.id AS order_id,
+         o.status,
+         o.created_at,
+         oi.product_name,
+         oi.quantity,
+         oi.price
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       WHERE o.user_id = ?
+       ORDER BY o.created_at DESC`,
+      [userId]
+    );
+
+    // Kelompokkan data per order_id
+    const orders = {};
+    rows.forEach((row) => {
+      const { order_id, status, created_at, product_name, quantity, price } =
+        row;
+
+      if (!orders[order_id]) {
+        orders[order_id] = {
+          order_id,
+          status,
+          created_at,
+          items: [],
+        };
+      }
+
+      orders[order_id].items.push({
+        product_name,
+        quantity,
+        price,
+      });
+    });
+
+    res.json(Object.values(orders));
+  } catch (err) {
+    res.status(500).json({
+      message: "Gagal mengambil detail pesanan",
+      error: err.message,
+    });
+  }
+});
+
 // GET detail order by ID milik user
 router.get("/:id", authenticateJWT, async (req, res) => {
   const userId = req.user.id;

@@ -1,6 +1,7 @@
 Build from heart to heart........
 
 there is our query:
+
 ```
 CREATE TABLE users (
 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -75,4 +76,7 @@ INSERT INTO product_categories (name, description, created_at, updated_at) VALUE
 
 ALTER TABLE products
 ADD COLUMN deleted_at DATETIME DEFAULT NULL;
+
+ALTER TABLE products
+ADD COLUMN image_url VARCHAR(255);
 ```

@@ -77,6 +77,111 @@ router.get("/", authenticateJWT, async (req, res) => {
   }
 });
 
+router.get("/all", authenticateJWT, async (req, res) => {
+  // Pastikan user adalah admin atau penjual
+  if (req.user.role !== "admin" && req.user.role !== "penjual") {
+    return res.status(403).json({ message: "Akses ditolak" });
+  }
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT 
+         o.id AS order_id,
+         o.user_id,
+         o.status,
+         o.created_at,
+         oi.product_name,
+         oi.quantity,
+         oi.price
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       ORDER BY o.created_at DESC`
+    );
+
+    const orders = {};
+    rows.forEach((row) => {
+      const {
+        order_id,
+        user_id,
+        status,
+        created_at,
+        product_name,
+        quantity,
+        price,
+      } = row;
+
+      if (!orders[order_id]) {
+        orders[order_id] = {
+          order_id,
+          user_id,
+          status,
+          created_at,
+          items: [],
+        };
+      }
+
+      orders[order_id].items.push({
+        product_name,
+        quantity,
+        price,
+      });
+    });
+
+    res.json(Object.values(orders));
+  } catch (err) {
+    res.status(500).json({
+      message: "Gagal mengambil semua pesanan",
+      error: err.message,
+    });
+  }
+});
+
+// PATCH update status pesanan (admin/penjual)
+router.patch("/:id/status", authenticateJWT, async (req, res) => {
+  const orderId = req.params.id;
+  const { status } = req.body;
+
+  const allowedStatuses = [
+    "pending",
+    "processing",
+    "shipped",
+    "completed",
+    "cancelled",
+  ];
+
+  // Hanya admin atau penjual yang bisa mengubah status pesanan
+  if (req.user.role !== "admin" && req.user.role !== "penjual") {
+    return res.status(403).json({ message: "Akses ditolak" });
+  }
+
+  // Validasi status
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({ message: "Status tidak valid" });
+  }
+
+  try {
+    const [result] = await pool.query(
+      `UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?`,
+      [status, orderId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Pesanan tidak ditemukan" });
+    }
+
+    res.json({
+      message: "Status pesanan berhasil diperbarui",
+      orderId,
+      status,
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: "Gagal memperbarui status pesanan",
+      error: err.message,
+    });
+  }
+});
+
 // GET semua pesanan lengkap beserta item-nya (riwayat belanja user)
 router.get("/detail", authenticateJWT, async (req, res) => {
   const userId = req.user.id;

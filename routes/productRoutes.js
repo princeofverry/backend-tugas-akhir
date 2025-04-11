@@ -157,4 +157,37 @@ router.delete(
   }
 );
 
+// ✅ DELETE permanen produk
+router.delete(
+  "/permanent/:id",
+  authenticateJWT,
+  checkRole("penjual"),
+  async (req, res) => {
+    const productId = req.params.id;
+    const user_id = req.user.id;
+
+    try {
+      const [result] = await pool.query(
+        "DELETE FROM products WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL",
+        [productId, user_id]
+      );
+
+      if (result.affectedRows === 0) {
+        return res
+          .status(404)
+          .json({
+            message:
+              "Produk tidak ditemukan, bukan milik Anda, atau belum dihapus",
+          });
+      }
+
+      res.json({ message: "Produk berhasil dihapus secara permanen" });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ message: "Gagal menghapus produk secara permanen" });
+    }
+  }
+);
+
 module.exports = router;
